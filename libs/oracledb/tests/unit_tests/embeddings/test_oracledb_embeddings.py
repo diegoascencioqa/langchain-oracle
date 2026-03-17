@@ -1,7 +1,7 @@
 # Copyright (c) 2024, 2025 Oracle and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
 """
-unit_tests/embeddings/test_oracleai_embeddings.py
+unit_tests/embeddings/test_oracledb_embeddings.py
 
 Unit tests for OracleEmbeddings, exercising the full embeddings contract
 without any real database connection. All DB interactions are intercepted
@@ -19,7 +19,7 @@ Covers:
 - embed_query delegation to embed_documents and correct result unwrapping
 
 Run:
-    pytest tests/unit_tests/embeddings/test_oracleai_embeddings.py 
+    pytest tests/unit_tests/embeddings/test_oracledb_embeddings.py 
 
 Authors:
     - Diego Ascencio (diegoascencioqa)
