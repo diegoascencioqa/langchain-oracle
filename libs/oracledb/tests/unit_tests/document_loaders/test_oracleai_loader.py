@@ -31,7 +31,6 @@ Run:
 Authors:
     - Diego Ascencio (diegoascencioqa)
 """
-"""
 
 from __future__ import annotations
 
