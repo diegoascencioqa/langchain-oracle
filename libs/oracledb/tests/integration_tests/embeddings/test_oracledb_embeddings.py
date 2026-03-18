@@ -45,8 +45,6 @@ from langchain_tests.integration_tests import EmbeddingsIntegrationTests
 
 from langchain_oracledb import OracleEmbeddings
 
-pytestmark = [pytest.mark.integration, pytest.mark.oracle]
-
 # ---------------------------------------------------------------------------
 # Credentials from environment variables
 # ---------------------------------------------------------------------------

@@ -52,7 +52,6 @@ from langchain_oracledb.vectorstores.oraclevs import (
     drop_table_purge,
 )
 
-pytestmark = [pytest.mark.integration, pytest.mark.oracle]
 
 # ---------------------------------------------------------------------------
 # Credentials from environment variables
