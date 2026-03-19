@@ -374,6 +374,8 @@ class TestOracleDocLoaderTableMode:
     def loader_with_rows(self, rows, mdata_cols=None, fetchall_rows=None):
         conn, cursor = make_conn()
         cursor.__iter__ = MagicMock(return_value=iter(rows))
+        # fetchall is used by the loader to look up mdata_col types from Oracle's
+        # data dictionary. Only needed when mdata_cols is set; defaults to empty.
         cursor.fetchall.return_value = fetchall_rows or []
         params = {"tablename": "MY_TABLE", "owner": "SCOTT", "colname": "TEXT_COL"}
         if mdata_cols is not None:
@@ -382,22 +384,19 @@ class TestOracleDocLoaderTableMode:
         return loader, cursor
 
     def test_raises_when_owner_missing(self):
-        """SOURCE BUG: the except block calls cursor.close() before cursor is
-        assigned, so UnboundLocalError masks the original 'Missing owner or
-        column name' exception. Expected once fixed:
-        pytest.raises(Exception, match='Missing owner or column name')"""
+        """Missing owner must raise with 'Missing owner or column name' message."""
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"tablename": "T", "colname": "C"})
         with patch("oracledb.defaults"):
-            with pytest.raises(UnboundLocalError):
+            with pytest.raises(Exception, match="Missing owner or column name"):
                 loader.load()
 
     def test_raises_when_colname_missing(self):
-        """SOURCE BUG: same cursor-before-assignment issue as test_raises_when_owner_missing."""
+        """Missing colname must raise with 'Missing owner or column name' message."""
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"tablename": "T", "owner": "U"})
         with patch("oracledb.defaults"):
-            with pytest.raises(UnboundLocalError):
+            with pytest.raises(Exception, match="Missing owner or column name"):
                 loader.load()
 
     def test_normal_row_produces_document(self):
@@ -512,15 +511,7 @@ class TestOracleDocLoaderTableMode:
                 loader.load()
 
     def test_extra_cols_stored_in_metadata(self):
-        """
-        When mdata_cols is provided, each column value should appear in the
-        document metadata keyed by its column name.
-
-        NOTE: This test currently documents a bug in oracleai.py — the source
-        uses row[i+2] to read extra columns, but row[2] is already the rowid,
-        so every extra column is shifted by one position. Expected behaviour
-        once fixed: AUTHOR="Alice", SUBJECT="Science". See bug tracker #XXX.
-        """
+        """Each mdata_col value must appear in metadata keyed by its column name."""
         conn, cursor = make_conn()
         rows = [(None, "body", "R1", "Alice", "Science")]
         cursor.__iter__ = MagicMock(return_value=iter(rows))
@@ -531,8 +522,8 @@ class TestOracleDocLoaderTableMode:
         })
         with patch("oracledb.defaults"):
             docs = loader.load()
-        assert docs[0].metadata["AUTHOR"] == "R1"     # rowid bleeds in (bug)
-        assert docs[0].metadata["SUBJECT"] == "Alice"  # shifted by 1 (bug)
+        assert docs[0].metadata["AUTHOR"] == "Alice"
+        assert docs[0].metadata["SUBJECT"] == "Science"
 
 
 # ===========================================================================

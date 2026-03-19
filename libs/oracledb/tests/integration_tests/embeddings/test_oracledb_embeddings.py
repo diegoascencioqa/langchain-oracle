@@ -322,23 +322,23 @@ class TestFunctionalSemanticSimilarity:
 class TestFunctionalLoadOnnxModelValidation:
 
     def test_none_conn_raises(self, connection):
-        """SOURCE BUG: UnboundLocalError masks 'Invalid input' — documents bug."""
-        with pytest.raises((Exception, UnboundLocalError)):
+        """None conn must raise Exception with 'Invalid input' message."""
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(None, "MY_DIR", "model.onnx", "MY_MODEL")
 
     def test_none_dir_raises(self, connection):
-        """SOURCE BUG: same cursor-before-assignment issue."""
-        with pytest.raises((Exception, UnboundLocalError)):
+        """None dir must raise Exception with 'Invalid input' message."""
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(connection, None, "model.onnx", "MY_MODEL")
 
     def test_none_onnx_file_raises(self, connection):
-        """SOURCE BUG: same cursor-before-assignment issue."""
-        with pytest.raises((Exception, UnboundLocalError)):
+        """None onnx file must raise Exception with 'Invalid input' message."""
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(connection, "MY_DIR", None, "MY_MODEL")
 
     def test_none_model_name_raises(self, connection):
-        """SOURCE BUG: same cursor-before-assignment issue."""
-        with pytest.raises((Exception, UnboundLocalError)):
+        """None model name must raise Exception with 'Invalid input' message."""
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(connection, "MY_DIR", "model.onnx", None)
 
     def test_nonexistent_dir_raises_oracle_error(self, connection):

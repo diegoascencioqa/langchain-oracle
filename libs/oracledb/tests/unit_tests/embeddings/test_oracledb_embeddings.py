@@ -10,7 +10,7 @@ via mock conn and cursor objects at exact call sites.
 Covers:
 - Constructor attribute storage and defaults (conn, params, proxy, extra field rejection)
 - load_onnx_model PL/SQL execution, bind variable correctness, and cursor cleanup
-- Known source bugs documented (UnboundLocalError on None inputs in load_onnx_model)
+- load_onnx_model None input validation (None conn, dir, onnx file, model name all raise)
 - embed_documents output shape, vector parsing, and multi-text batching
 - embed_documents internals (fetch_lobs flag, setinputsizes, utl_to_embeddings SQL,
   SYS.VECTOR_ARRAY_T type fetch, chunk id and data construction)
@@ -83,34 +83,34 @@ def embed_row(chunk_id: int, vector: list) -> tuple:
 class TestConstructor:
 
     def test_basic_construction(self):
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         embedder = make_embedder(conn)
         assert embedder is not None
 
     def test_conn_stored(self):
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         embedder = make_embedder(conn)
         assert embedder.conn is conn
 
     def test_params_stored(self):
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         params = {"provider": "database", "model": "allminilm"}
         embedder = make_embedder(conn, params=params)
         assert embedder.params == params
 
     def test_proxy_stored(self):
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         embedder = make_embedder(conn, proxy="http://proxy:80")
         assert embedder.proxy == "http://proxy:80"
 
     def test_proxy_is_none_by_default(self):
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         embedder = make_embedder(conn)
         assert embedder.proxy is None
 
     def test_extra_fields_forbidden(self):
         """model_config = extra='forbid' — unknown fields must raise."""
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         with pytest.raises(Exception):
             OracleEmbeddings(conn=conn, params={}, unknown_field="x")
 
@@ -146,28 +146,26 @@ class TestLoadOnnxModel:
         cursor.close.assert_called_once()
 
     def test_raises_on_none_conn(self):
-        """SOURCE BUG: the except block calls cursor.close() before cursor is assigned.
-        The intended error is 'Invalid input' but UnboundLocalError surfaces instead.
-        Expected once fixed: pytest.raises(Exception, match='Invalid input')"""
-        with pytest.raises(UnboundLocalError):
+        """None conn must raise Exception with 'Invalid input' message."""
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(None, "MY_DIR", "model.onnx", "MY_MODEL")
 
     def test_raises_on_none_dir(self):
-        """SOURCE BUG: same cursor-before-assignment issue as test_raises_on_none_conn."""
-        conn, _ = make_conn()
-        with pytest.raises(UnboundLocalError):
+        """None dir must raise Exception with 'Invalid input' message."""
+        conn, cursor = make_conn()
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(conn, None, "model.onnx", "MY_MODEL")
 
     def test_raises_on_none_onnx_file(self):
-        """SOURCE BUG: same cursor-before-assignment issue as test_raises_on_none_conn."""
-        conn, _ = make_conn()
-        with pytest.raises(UnboundLocalError):
+        """None onnx file must raise Exception with 'Invalid input' message."""
+        conn, cursor = make_conn()
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(conn, "MY_DIR", None, "MY_MODEL")
 
     def test_raises_on_none_model_name(self):
-        """SOURCE BUG: same cursor-before-assignment issue as test_raises_on_none_conn."""
-        conn, _ = make_conn()
-        with pytest.raises(UnboundLocalError):
+        """None model name must raise Exception with 'Invalid input' message."""
+        conn, cursor = make_conn()
+        with pytest.raises(Exception, match="Invalid input"):
             OracleEmbeddings.load_onnx_model(conn, "MY_DIR", "model.onnx", None)
 
     def test_reraises_db_exception(self):
@@ -338,7 +336,7 @@ class TestEmbedQuery:
 
     def test_delegates_to_embed_documents_with_single_element_list(self):
         """embed_query must call embed_documents(["text"]) and return result[0]."""
-        conn, _ = make_conn()
+        conn, cursor = make_conn()
         embedder = make_embedder(conn)
         with patch.object(OracleEmbeddings, "embed_documents",
                           return_value=[[0.1, 0.2]]) as mock_embed:

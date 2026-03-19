@@ -241,9 +241,7 @@ class TestGetSummaryDocument:
 class TestGetSummaryListStr:
 
     def test_list_str_two_items_returns_two_results(self, connection):
-        """SOURCE BUG: list mode returns all items with the last value due to
-        off-by-one in getvalue(i). Once fixed this should assert independent values.
-        For now we just verify the count and type."""
+        """Each item in the list must produce an independent summary."""
         s = OracleSummary(
             conn=connection,
             params={"provider": "database", "glevel": "S"},
@@ -271,7 +269,7 @@ class TestGetSummaryListStr:
 class TestGetSummaryListDocument:
 
     def test_list_document_two_items_returns_two_results(self, connection):
-        """SOURCE BUG: same off-by-one as list str. Verifying count and type."""
+        """Each Document in the list must produce an independent summary."""
         s = OracleSummary(
             conn=connection,
             params={"provider": "database", "glevel": "S"},
@@ -335,13 +333,11 @@ class TestGetSummaryInvalidInputs:
         with pytest.raises(Exception, match="Invalid input type"):
             s.get_summary([SAMPLE_DOC, 42])
 
-    def test_empty_list_raises_unbound_local_error(self, connection):
-        """SOURCE BUG: empty list causes UnboundLocalError because i is never
-        assigned in the for loop. Expected once fixed: returns []."""
+    def test_empty_list_returns_empty_list(self, connection):
+        """Empty list input must return an empty list without raising."""
         s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "S"})
-        with pytest.raises(UnboundLocalError):
-            s.get_summary([])
-
+        result = s.get_summary([])
+        assert result == []
 
 # ===========================================================================
 # Functional — summary quality

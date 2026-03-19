@@ -362,9 +362,7 @@ class TestFunctionalParseMetadata:
         assert parser.metadata["title"] == "My Paper"
 
     def test_parser_reuse_does_not_bleed_state(self):
-        """Two separate parser instances must not share metadata.
-        Note: reset() only resets HTMLParser internal state, not self.metadata —
-        so a fresh instance is required for a clean parse."""
+        """Two separate parser instances must not share metadata (reset() does not clear it)."""
         parser1 = ParseOracleDocMetadata()
         parser1.feed('<meta name="author" content="Alice">')
         assert parser1.metadata["author"] == "Alice"

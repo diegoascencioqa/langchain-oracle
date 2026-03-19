@@ -266,16 +266,15 @@ class TestRunQueryExecution:
         cursor.execute.assert_called_once_with("SELECT * FROM T WHERE ID=:1", [42])
 
     def test_returns_empty_list_on_db_error(self):
-        """SOURCE BUG: finally block calls cursor.close() before cursor is assigned
-        when connect() fails. Expected once fixed: returns [].
-        """
+        """When connect() fails, the connection error must propagate."""
         loader = make_loader()
         mock_db = MagicMock()
         mock_db.DatabaseError = Exception
         mock_db.LOB = type("LOB", (), {})
+        # Simulate connect() failing with a real Oracle error
         mock_db.connect.side_effect = Exception("ORA-01017: invalid credentials")
         with patch(PATCH_TARGET, mock_db):
-            with pytest.raises(UnboundLocalError):
+            with pytest.raises(Exception, match="ORA-01017"):
                 loader._run_query()
 
     def test_returns_list_of_dicts(self):
@@ -415,12 +414,13 @@ class TestLoad:
         assert docs == []
 
     def test_db_error_returns_empty_list(self):
-        """SOURCE BUG: same cursor-before-assignment issue in finally block."""
+        """When connect() fails, the connection error must propagate."""
         loader = make_loader()
         mock_db = MagicMock()
         mock_db.DatabaseError = Exception
         mock_db.LOB = type("LOB", (), {})
+        # Simulate connect() failing with a real Oracle error
         mock_db.connect.side_effect = Exception("ORA-12541: no listener")
         with patch(PATCH_TARGET, mock_db):
-            with pytest.raises(UnboundLocalError):
+            with pytest.raises(Exception, match="ORA-12541"):
                 loader.load()
