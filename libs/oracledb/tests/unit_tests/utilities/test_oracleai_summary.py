@@ -14,27 +14,26 @@ Covers:
 - get_summary(Document) page_content extraction, CLOB handling, and cursor cleanup
 - get_summary(List[str]) executemany path, row structure, and cursor cleanup
 - get_summary(List[Document]) page_content extraction in batch mode
-- Known source bugs documented (off-by-one in list mode, UnboundLocalError on empty list)
 - Invalid top-level types raising (int, dict, float) with cursor cleanup
 - Invalid items inside lists raising (int, dict mixed with valid items)
 - Proxy path triggering utl_http execute and correct proxy value forwarding
-- Edge cases (empty string input, single-item list, empty list bug)
+- Edge cases (empty string input, single-item list, empty list)
 """
 
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from langchain_core.documents import Document
 
 from langchain_oracledb.utilities.oracleai import OracleSummary
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_conn():
     conn = MagicMock()
@@ -62,8 +61,8 @@ def setup_list_cursor(cursor, values):
 # Constructor
 # ===========================================================================
 
-class TestConstructor:
 
+class TestConstructor:
     def test_conn_stored(self):
         conn, _ = make_conn()
         s = OracleSummary(conn=conn, params={"provider": "database"})
@@ -90,8 +89,8 @@ class TestConstructor:
 # get_summary — None input
 # ===========================================================================
 
-class TestGetSummaryNone:
 
+class TestGetSummaryNone:
     def test_none_returns_empty_list(self):
         conn, cursor = make_conn()
         s = OracleSummary(conn=conn, params={"provider": "database"})
@@ -109,8 +108,8 @@ class TestGetSummaryNone:
 # get_summary — str input
 # ===========================================================================
 
-class TestGetSummaryStr:
 
+class TestGetSummaryStr:
     def test_str_returns_single_item_list(self):
         conn, cursor = make_conn()
         cursor.var.return_value = make_clob_var("A summary.")
@@ -169,8 +168,8 @@ class TestGetSummaryStr:
 # get_summary — Document input
 # ===========================================================================
 
-class TestGetSummaryDocument:
 
+class TestGetSummaryDocument:
     def test_document_returns_single_item_list(self):
         conn, cursor = make_conn()
         cursor.var.return_value = make_clob_var("Doc summary.")
@@ -213,30 +212,25 @@ class TestGetSummaryDocument:
 # get_summary — List[str] input
 # ===========================================================================
 
-class TestGetSummaryListStr:
 
+class TestGetSummaryListStr:
     def test_list_str_returns_one_summary_per_item(self):
-        """SOURCE BUG: value = summary.getvalue(i) uses the last loop index for
-        ALL items in the list comprehension. So all results get the LAST value.
-        Expected once fixed: result[0]=="Sum A", result[1]=="Sum B"."""
+        """Each input string should map to its own summary result."""
         conn, cursor = make_conn()
         setup_list_cursor(cursor, ["Sum A", "Sum B"])
         s = OracleSummary(conn=conn, params={})
         result = s.get_summary(["text A", "text B"])
         assert len(result) == 2
-        # Bug: all items get the value at the last index (index 1 = "Sum B")
-        assert result[0] == "Sum B"
+        assert result[0] == "Sum A"
         assert result[1] == "Sum B"
 
     def test_list_str_none_values_become_empty_string(self):
-        """SOURCE BUG: same off-by-one — all items get the value at the last index.
-        Expected once fixed: result[0]=="", result[1]=="ok"."""
+        """Each list slot should preserve its own NULL-to-empty conversion."""
         conn, cursor = make_conn()
         setup_list_cursor(cursor, [None, "ok"])
         s = OracleSummary(conn=conn, params={})
         result = s.get_summary(["t1", "t2"])
-        # Bug: all items get the value at last index (index 1 = "ok")
-        assert result[0] == "ok"
+        assert result[0] == ""
         assert result[1] == "ok"
 
     def test_list_str_uses_executemany(self):
@@ -285,19 +279,17 @@ class TestGetSummaryListStr:
 # get_summary — List[Document] input
 # ===========================================================================
 
-class TestGetSummaryListDocument:
 
+class TestGetSummaryListDocument:
     def test_list_document_returns_one_summary_per_doc(self):
-        """SOURCE BUG: same off-by-one as list str — all items get the last value.
-        Expected once fixed: result[0]=="Sum1", result[1]=="Sum2"."""
+        """Each input Document should map to its own summary result."""
         conn, cursor = make_conn()
         setup_list_cursor(cursor, ["Sum1", "Sum2"])
         s = OracleSummary(conn=conn, params={})
         docs = [Document(page_content="doc one"), Document(page_content="doc two")]
         result = s.get_summary(docs)
         assert len(result) == 2
-        # Bug: all items get value at last index (index 1 = "Sum2")
-        assert result[0] == "Sum2"
+        assert result[0] == "Sum1"
         assert result[1] == "Sum2"
 
     def test_list_document_uses_page_content_in_rows(self):
@@ -309,7 +301,9 @@ class TestGetSummaryListDocument:
         assert rows[0][0] == "the content"
 
     def test_list_invalid_item_type_raises(self):
-        """A list containing a non-str/non-Document item must raise 'Invalid input type'."""
+        """
+        A list containing a non-str/non-Document item must raise 'Invalid input type'.
+        """
         conn, cursor = make_conn()
         var = MagicMock()
         var.actual_elements = 0
@@ -332,8 +326,8 @@ class TestGetSummaryListDocument:
 # get_summary — invalid top-level types
 # ===========================================================================
 
-class TestGetSummaryInvalidTopLevelType:
 
+class TestGetSummaryInvalidTopLevelType:
     def test_int_raises_invalid_input(self):
         conn, _ = make_conn()
         s = OracleSummary(conn=conn, params={})
@@ -365,8 +359,8 @@ class TestGetSummaryInvalidTopLevelType:
 # get_summary — proxy
 # ===========================================================================
 
-class TestGetSummaryProxy:
 
+class TestGetSummaryProxy:
     def test_proxy_calls_utl_http_set_proxy(self):
         conn, cursor = make_conn()
         cursor.var.return_value = make_clob_var("summary")
@@ -396,19 +390,15 @@ class TestGetSummaryProxy:
 # get_summary — edge cases
 # ===========================================================================
 
-class TestGetSummaryEdgeCases:
 
-    def test_empty_list_raises_unbound_local_error(self):
-        """SOURCE BUG: value = summary.getvalue(i) — when list is empty, the
-        for loop never runs so i is unbound. Raises UnboundLocalError.
-        Expected once fixed: returns []."""
+class TestGetSummaryEdgeCases:
+    def test_empty_list_returns_empty_list(self):
+        """Empty list should short-circuit to an empty result without DB calls."""
         conn, cursor = make_conn()
-        var = MagicMock()
-        var.actual_elements = 0
-        cursor.var.return_value = var
         s = OracleSummary(conn=conn, params={})
-        with pytest.raises(UnboundLocalError):
-            s.get_summary([])
+        assert s.get_summary([]) == []
+        cursor.execute.assert_not_called()
+        cursor.executemany.assert_not_called()
 
     def test_single_item_list_returns_one_result(self):
         conn, cursor = make_conn()

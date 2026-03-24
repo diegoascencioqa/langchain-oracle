@@ -235,6 +235,7 @@ class OracleDocLoader(BaseLoader):
                             results.append(doc)
 
             if self.tablename:
+                cursor = None
                 try:
                     if self.owner is None or self.colname is None:
                         raise Exception("Missing owner or column name or both.")
@@ -345,7 +346,7 @@ class OracleDocLoader(BaseLoader):
                                 ncols = len(self.mdata_cols)
 
                             for i in range(0, ncols):
-                                metadata[self.mdata_cols[i]] = row[i + 2]
+                                metadata[self.mdata_cols[i]] = row[i + 3]
 
                             if row[1] is None:
                                 results.append(
@@ -360,7 +361,8 @@ class OracleDocLoader(BaseLoader):
                 except Exception as ex:
                     logger.info(f"An exception occurred :: {ex}")
                     traceback.print_exc()
-                    cursor.close()
+                    if cursor is not None:
+                        cursor.close()
                     raise
 
             return results

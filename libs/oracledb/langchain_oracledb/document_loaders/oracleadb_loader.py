@@ -86,6 +86,8 @@ class OracleAutonomousDatabaseLoader(BaseLoader):
             connect_param["wallet_location"] = self.wallet_location
             connect_param["wallet_password"] = self.wallet_password
 
+        connection = None
+        cursor = None
         try:
             connection = oracledb.connect(**connect_param)
             cursor = connection.cursor()
@@ -109,10 +111,12 @@ class OracleAutonomousDatabaseLoader(BaseLoader):
             ]
         except oracledb.DatabaseError as e:
             print("Got error while connecting: " + str(e))  # noqa: T201
-            data = []
+            raise
         finally:
-            cursor.close()
-            connection.close()
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
 
         return data
 

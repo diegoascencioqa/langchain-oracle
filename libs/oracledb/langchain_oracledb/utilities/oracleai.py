@@ -64,6 +64,8 @@ class OracleSummary:
 
         if docs is None:
             return []
+        if isinstance(docs, list) and not docs:
+            return []
 
         results: List[str] = []
         try:
@@ -124,7 +126,7 @@ class OracleSummary:
                 params = json.dumps(self.summary_params)
                 summary = cursor.var(oracledb.DB_TYPE_CLOB, arraysize=len(docs))
 
-                for i, doc in enumerate(docs):
+                for doc in docs:
                     if isinstance(doc, str):
                         docs_input.append((doc, params))
                     elif isinstance(doc, Document):
@@ -148,10 +150,8 @@ class OracleSummary:
                     docs_input,
                 )
 
-                value = summary.getvalue(i)
-
                 results = [
-                    "" if value is None else str(value)
+                    "" if summary.getvalue(i) is None else str(summary.getvalue(i))
                     for i in range(summary.actual_elements)
                 ]
 

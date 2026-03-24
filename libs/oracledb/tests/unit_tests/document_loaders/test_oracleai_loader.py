@@ -2,12 +2,12 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
 """
 unit_tests/document_loaders/test_oracleai_loader.py
- 
+
 Unit tests for OracleDocLoader, OracleTextSplitter, OracleDocReader and
 ParseOracleDocMetadata, exercising the full loader contract without any real
 database connection. All DB interactions are intercepted via mock conn and
 cursor objects at exact call sites.
- 
+
 Covers:
 - ParseOracleDocMetadata HTML parsing (meta name/content, title tag, edge cases)
 - OracleDocReader.generate_object_id format and uniqueness
@@ -17,17 +17,17 @@ Covers:
 - OracleDocLoader.load — file mode (single file, None result skipped)
 - OracleDocLoader.load — dir mode (empty dir, valid file, None skipped,
   nonexistent dir raises, subdirs ignored)
-- OracleDocLoader.load — table mode (missing owner raises UnboundLocalError,
-  missing colname raises UnboundLocalError, normal rows, None rows, rowid in
-  metadata, HTML metadata parsed, cursor closed on error)
+- OracleDocLoader.load — table mode (missing owner/colname raises validation
+  error, normal rows, None rows, rowid in metadata, HTML metadata parsed,
+  cursor closed on error)
 - OracleDocLoader.load — mdata_cols (limit exceeded raises, columns in SELECT,
-  unsupported type raises, off-by-one bug documented)
+  unsupported type raises, projected metadata mapped correctly)
 - OracleTextSplitter — params stored, split_text SQL content, bind variables,
   setinputsizes, multiple chunks, empty text, DB error reraised
- 
+
 Run:
     pytest tests/unit_tests/document_loaders/test_oracleai_loader.py
- 
+
 Authors:
     - Diego Ascencio (diegoascencioqa)
 """
@@ -35,10 +35,10 @@ Authors:
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
 
 import oracledb
+import pytest
 from langchain_core.documents import Document
 
 from langchain_oracledb.document_loaders.oracleai import (
@@ -48,10 +48,10 @@ from langchain_oracledb.document_loaders.oracleai import (
     ParseOracleDocMetadata,
 )
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def make_conn(username: str = "vector_user") -> tuple:
     """Return (mock_conn, mock_cursor). cursor is what conn.cursor() returns."""
@@ -66,8 +66,8 @@ def make_conn(username: str = "vector_user") -> tuple:
 # ParseOracleDocMetadata
 # ===========================================================================
 
-class TestParseOracleDocMetadata:
 
+class TestParseOracleDocMetadata:
     def test_empty_html_yields_empty_dict(self):
         parser = ParseOracleDocMetadata()
         parser.feed("<html></html>")
@@ -80,7 +80,9 @@ class TestParseOracleDocMetadata:
 
     def test_multiple_meta_tags(self):
         parser = ParseOracleDocMetadata()
-        parser.feed('<meta name="author" content="Alice"><meta name="subject" content="AI">')
+        parser.feed(
+            '<meta name="author" content="Alice"><meta name="subject" content="AI">'
+        )
         metadata = parser.get_metadata()
         assert metadata["author"] == "Alice"
         assert metadata["subject"] == "AI"
@@ -92,7 +94,9 @@ class TestParseOracleDocMetadata:
 
     def test_title_and_meta_together(self):
         parser = ParseOracleDocMetadata()
-        parser.feed('<html><head><title>T</title><meta name="kw" content="v"></head></html>')
+        parser.feed(
+            '<html><head><title>T</title><meta name="kw" content="v"></head></html>'
+        )
         metadata = parser.get_metadata()
         assert metadata["title"] == "T"
         assert metadata["kw"] == "v"
@@ -118,7 +122,10 @@ class TestParseOracleDocMetadata:
 
     def test_doctype_html_prefix_does_not_break_parsing(self):
         parser = ParseOracleDocMetadata()
-        html = '<!DOCTYPE html<html><head><meta name="creator" content="Bob"></head></html>'
+        html = (
+            '<!DOCTYPE html<html><head><meta name="creator" '
+            'content="Bob"></head></html>'
+        )
         parser.feed(html)
         assert parser.get_metadata().get("creator") == "Bob"
 
@@ -127,8 +134,8 @@ class TestParseOracleDocMetadata:
 # OracleDocReader.generate_object_id
 # ===========================================================================
 
-class TestGenerateObjectId:
 
+class TestGenerateObjectId:
     def test_returns_32_char_string(self):
         oid = OracleDocReader.generate_object_id("test")
         assert isinstance(oid, str) and len(oid) == 32
@@ -153,8 +160,8 @@ class TestGenerateObjectId:
 # OracleDocReader.read_file
 # ===========================================================================
 
-class TestOracleDocReaderReadFile:
 
+class TestOracleDocReaderReadFile:
     def setup_cursor_vars(self, mdata_val, text_val):
         conn, cursor = make_conn()
         mdata_var = MagicMock()
@@ -173,80 +180,104 @@ class TestOracleDocReaderReadFile:
 
     def test_returns_document_with_page_content(self):
         conn, cursor = self.setup_cursor_vars(None, "hello world")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/t.txt", {})
         assert isinstance(doc, Document)
         assert doc.page_content == "hello world"
 
     def test_metadata_always_has_oid_and_file(self):
         conn, cursor = self.setup_cursor_vars(None, "text")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/doc.txt", {})
         assert "_oid" in doc.metadata
         assert doc.metadata["_file"] == "/tmp/doc.txt"
 
     def test_none_text_var_yields_empty_page_content(self):
         conn, cursor = self.setup_cursor_vars(None, None)
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/t.txt", {})
         assert doc.page_content == ""
 
     def test_empty_file_returns_document_with_empty_content(self):
         conn, cursor = self.setup_cursor_vars(None, None)
-        with patch("builtins.open", return_value=self.fake_open(b"")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/empty.txt", {})
         assert isinstance(doc, Document)
         assert doc.page_content == ""
 
     def test_html_mdata_parsed_into_metadata(self):
-        html = '<!DOCTYPE html<html><head><meta name="author" content="Eve"></head></html>'
+        html = (
+            '<!DOCTYPE html<html><head><meta name="author" content="Eve"></head></html>'
+        )
         conn, cursor = self.setup_cursor_vars(html, "body text")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/d.html", {})
         assert doc.metadata.get("author") == "Eve"
 
     def test_html_mdata_starting_with_HTML_tag_also_parsed(self):
         html = '<HTML><HEAD><meta name="creator" content="Oracle"></HEAD></HTML>'
         conn, cursor = self.setup_cursor_vars(html, "body text")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/d.html", {})
         assert doc.metadata.get("creator") == "Oracle"
 
     def test_cursor_closed_on_success(self):
         conn, cursor = self.setup_cursor_vars(None, "text")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             OracleDocReader.read_file(conn, "/tmp/t.txt", {})
         cursor.close.assert_called_once()
 
     def test_oid_seeded_with_username_and_filepath(self):
         conn, cursor = self.setup_cursor_vars(None, "text")
         conn.username = "scott"
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"), \
-             patch.object(OracleDocReader, "generate_object_id", return_value="ABC123") as mock_gen:
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+            patch.object(
+                OracleDocReader, "generate_object_id", return_value="ABC123"
+            ) as mock_gen,
+        ):
             doc = OracleDocReader.read_file(conn, "/tmp/f.txt", {})
         mock_gen.assert_called_once_with("scott$/tmp/f.txt")
         assert doc.metadata["_oid"] == "ABC123"
 
     def test_returns_none_on_file_open_error(self):
         conn, cursor = make_conn()
-        with patch("builtins.open", side_effect=IOError("permission denied")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", side_effect=IOError("permission denied")),
+            patch("oracledb.defaults"),
+        ):
             doc = OracleDocReader.read_file(conn, "/bad/path.txt", {})
         assert doc is None
 
     def test_cursor_closed_on_exception(self):
         conn, cursor = make_conn()
         cursor.var.side_effect = Exception("ORA-01234")
-        with patch("builtins.open", return_value=self.fake_open(b"bytes")), \
-             patch("oracledb.defaults"):
+        with (
+            patch("builtins.open", return_value=self.fake_open(b"bytes")),
+            patch("oracledb.defaults"),
+        ):
             result = OracleDocReader.read_file(conn, "/tmp/t.txt", {})
         cursor.close.assert_called_once()
         assert result is None
@@ -256,8 +287,8 @@ class TestOracleDocReaderReadFile:
 # OracleDocLoader — constructor
 # ===========================================================================
 
-class TestOracleDocLoaderConstructor:
 
+class TestOracleDocLoaderConstructor:
     def test_stores_conn(self):
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={})
@@ -280,17 +311,23 @@ class TestOracleDocLoaderConstructor:
 # OracleDocLoader.load — FILE mode
 # ===========================================================================
 
-class TestOracleDocLoaderFileMode:
 
+class TestOracleDocLoaderFileMode:
     def test_single_file_returns_one_document(self, tmp_path):
         file_path = tmp_path / "doc.txt"
         file_path.write_text("content")
-        expected_doc = Document(page_content="content", metadata={"_oid": "x", "_file": str(file_path)})
+        expected_doc = Document(
+            page_content="content", metadata={"_oid": "x", "_file": str(file_path)}
+        )
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"file": str(file_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   return_value=expected_doc), \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                return_value=expected_doc,
+            ),
+            patch("oracledb.defaults"),
+        ):
             docs = loader.load()
         assert len(docs) == 1
         assert docs[0].page_content == "content"
@@ -300,9 +337,13 @@ class TestOracleDocLoaderFileMode:
         file_path.write_text("x")
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"file": str(file_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   return_value=None), \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                return_value=None,
+            ),
+            patch("oracledb.defaults"),
+        ):
             docs = loader.load()
         assert docs == []
 
@@ -311,25 +352,35 @@ class TestOracleDocLoaderFileMode:
 # OracleDocLoader.load — DIR mode
 # ===========================================================================
 
-class TestOracleDocLoaderDirMode:
 
+class TestOracleDocLoaderDirMode:
     def test_empty_directory_returns_empty_list(self, tmp_path):
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"dir": str(tmp_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   return_value=None), \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                return_value=None,
+            ),
+            patch("oracledb.defaults"),
+        ):
             docs = loader.load()
         assert docs == []
 
     def test_one_valid_file_produces_one_document(self, tmp_path):
         (tmp_path / "a.txt").write_text("hello")
-        expected_doc = Document(page_content="hello", metadata={"_oid": "y", "_file": "a.txt"})
+        expected_doc = Document(
+            page_content="hello", metadata={"_oid": "y", "_file": "a.txt"}
+        )
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"dir": str(tmp_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   return_value=expected_doc), \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                return_value=expected_doc,
+            ),
+            patch("oracledb.defaults"),
+        ):
             docs = loader.load()
         assert len(docs) == 1
 
@@ -339,9 +390,13 @@ class TestOracleDocLoaderDirMode:
         good_doc = Document(page_content="x", metadata={"_oid": "1", "_file": "a.txt"})
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"dir": str(tmp_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   side_effect=[good_doc, None]), \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                side_effect=[good_doc, None],
+            ),
+            patch("oracledb.defaults"),
+        ):
             docs = loader.load()
         assert len(docs) == 1
 
@@ -355,12 +410,18 @@ class TestOracleDocLoaderDirMode:
     def test_only_files_processed_not_subdirs(self, tmp_path):
         (tmp_path / "sub").mkdir()
         (tmp_path / "doc.txt").write_text("text")
-        expected_doc = Document(page_content="text", metadata={"_oid": "z", "_file": "doc.txt"})
+        expected_doc = Document(
+            page_content="text", metadata={"_oid": "z", "_file": "doc.txt"}
+        )
         conn, cursor = make_conn()
         loader = OracleDocLoader(conn=conn, params={"dir": str(tmp_path)})
-        with patch("langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
-                   return_value=expected_doc) as mock_read_file, \
-             patch("oracledb.defaults"):
+        with (
+            patch(
+                "langchain_oracledb.document_loaders.oracleai.OracleDocReader.read_file",
+                return_value=expected_doc,
+            ) as mock_read_file,
+            patch("oracledb.defaults"),
+        ):
             loader.load()
         assert mock_read_file.call_count == 1
 
@@ -369,8 +430,8 @@ class TestOracleDocLoaderDirMode:
 # OracleDocLoader.load — TABLE mode
 # ===========================================================================
 
-class TestOracleDocLoaderTableMode:
 
+class TestOracleDocLoaderTableMode:
     def loader_with_rows(self, rows, mdata_cols=None, fetchall_rows=None):
         conn, cursor = make_conn()
         cursor.__iter__ = MagicMock(return_value=iter(rows))
@@ -439,7 +500,9 @@ class TestOracleDocLoaderTableMode:
         assert docs[0].metadata["_rowid"] == "ROWID_XYZ"
 
     def test_html_mdata_parsed_from_row(self):
-        html = '<!DOCTYPE html<html><head><meta name="author" content="Bob"></head></html>'
+        html = (
+            '<!DOCTYPE html<html><head><meta name="author" content="Bob"></head></html>'
+        )
         rows = [(html, "plain text", "R1")]
         loader, cursor = self.loader_with_rows(rows)
         with patch("oracledb.defaults"):
@@ -466,7 +529,9 @@ class TestOracleDocLoaderTableMode:
         cursor.__iter__ = MagicMock(return_value=iter([]))
         cursor.fetchall.return_value = []
         cursor.execute.side_effect = Exception("ORA-00942: table not found")
-        loader = OracleDocLoader(conn=conn, params={"tablename": "X", "owner": "U", "colname": "C"})
+        loader = OracleDocLoader(
+            conn=conn, params={"tablename": "X", "owner": "U", "colname": "C"}
+        )
         with patch("oracledb.defaults"):
             with pytest.raises(Exception, match="ORA-00942"):
                 loader.load()
@@ -476,10 +541,15 @@ class TestOracleDocLoaderTableMode:
         conn, cursor = make_conn()
         cursor.__iter__ = MagicMock(return_value=iter([]))
         cursor.fetchall.return_value = []
-        loader = OracleDocLoader(conn=conn, params={
-            "tablename": "T", "owner": "U", "colname": "C",
-            "mdata_cols": ["A", "B", "C", "D"],
-        })
+        loader = OracleDocLoader(
+            conn=conn,
+            params={
+                "tablename": "T",
+                "owner": "U",
+                "colname": "C",
+                "mdata_cols": ["A", "B", "C", "D"],
+            },
+        )
         with patch("oracledb.defaults"):
             with pytest.raises(Exception, match="Exceeds the max number"):
                 loader.load()
@@ -488,10 +558,15 @@ class TestOracleDocLoaderTableMode:
         conn, cursor = make_conn()
         cursor.__iter__ = MagicMock(return_value=iter([]))
         cursor.fetchall.return_value = [("TITLE", "VARCHAR2"), ("AUTHOR", "VARCHAR2")]
-        loader = OracleDocLoader(conn=conn, params={
-            "tablename": "T", "owner": "U", "colname": "C",
-            "mdata_cols": ["TITLE", "AUTHOR"],
-        })
+        loader = OracleDocLoader(
+            conn=conn,
+            params={
+                "tablename": "T",
+                "owner": "U",
+                "colname": "C",
+                "mdata_cols": ["TITLE", "AUTHOR"],
+            },
+        )
         with patch("oracledb.defaults"):
             loader.load()
         last_sql = str(cursor.execute.call_args_list[-1])
@@ -502,10 +577,15 @@ class TestOracleDocLoaderTableMode:
         conn, cursor = make_conn()
         cursor.__iter__ = MagicMock(return_value=iter([]))
         cursor.fetchall.return_value = [("CONTENT", "BLOB")]
-        loader = OracleDocLoader(conn=conn, params={
-            "tablename": "T", "owner": "U", "colname": "C",
-            "mdata_cols": ["CONTENT"],
-        })
+        loader = OracleDocLoader(
+            conn=conn,
+            params={
+                "tablename": "T",
+                "owner": "U",
+                "colname": "C",
+                "mdata_cols": ["CONTENT"],
+            },
+        )
         with patch("oracledb.defaults"):
             with pytest.raises(Exception, match="datatype.*not supported"):
                 loader.load()
@@ -516,10 +596,15 @@ class TestOracleDocLoaderTableMode:
         rows = [(None, "body", "R1", "Alice", "Science")]
         cursor.__iter__ = MagicMock(return_value=iter(rows))
         cursor.fetchall.return_value = [("AUTHOR", "VARCHAR2"), ("SUBJECT", "VARCHAR2")]
-        loader = OracleDocLoader(conn=conn, params={
-            "tablename": "T", "owner": "U", "colname": "C",
-            "mdata_cols": ["AUTHOR", "SUBJECT"],
-        })
+        loader = OracleDocLoader(
+            conn=conn,
+            params={
+                "tablename": "T",
+                "owner": "U",
+                "colname": "C",
+                "mdata_cols": ["AUTHOR", "SUBJECT"],
+            },
+        )
         with patch("oracledb.defaults"):
             docs = loader.load()
         assert docs[0].metadata["AUTHOR"] == "Alice"
@@ -530,8 +615,8 @@ class TestOracleDocLoaderTableMode:
 # OracleTextSplitter
 # ===========================================================================
 
-class TestOracleTextSplitter:
 
+class TestOracleTextSplitter:
     def make_splitter(self, fetchone_side_effect, params=None):
         conn, cursor = make_conn()
         cursor.fetchone.side_effect = fetchone_side_effect
@@ -542,10 +627,14 @@ class TestOracleTextSplitter:
         return splitter, cursor
 
     def chunk_row(self, text: str) -> tuple:
-        payload = json.dumps({
-            "chunk_id": 1, "chunk_offset": 0,
-            "chunk_length": len(text), "chunk_data": text,
-        })
+        payload = json.dumps(
+            {
+                "chunk_id": 1,
+                "chunk_offset": 0,
+                "chunk_length": len(text),
+                "chunk_data": text,
+            }
+        )
         return (payload,)
 
     def test_stores_params(self):
@@ -561,7 +650,9 @@ class TestOracleTextSplitter:
         assert result == ["hello"]
 
     def test_multiple_chunks_returned(self):
-        splitter, cursor = self.make_splitter([self.chunk_row("first"), self.chunk_row("second"), None])
+        splitter, cursor = self.make_splitter(
+            [self.chunk_row("first"), self.chunk_row("second"), None]
+        )
         with patch("oracledb.defaults"):
             result = splitter.split_text("first second")
         assert result == ["first", "second"]
@@ -602,7 +693,12 @@ class TestOracleTextSplitter:
         assert json.dumps(params) in cursor.execute.call_args.kwargs["params"]
 
     def test_by_vocabulary_params(self):
-        params = {"by": "vocabulary", "vocabulary": "MYVOCAB", "max": "200", "overlap": "0"}
+        params = {
+            "by": "vocabulary",
+            "vocabulary": "MYVOCAB",
+            "max": "200",
+            "overlap": "0",
+        }
         splitter, cursor = self.make_splitter([None], params=params)
         with patch("oracledb.defaults"):
             splitter.split_text("text")

@@ -14,12 +14,12 @@ Covers:
 - _run_query execution (with and without parameters, list vs dict params)
 - LOB value resolution via .read()
 - Row-to-dict mapping from cursor.description
-- Known source bugs documented (UnboundLocalError when connect() fails)
+- Database connection errors propagated with cleanup
 - load() -> List[Document] with correct page_content, metadata extraction,
   multiple metadata columns, and empty result handling
 
 Run:
-    pytest tests/unit_tests/document_loaders/test_oracleadb_loader.py 
+    pytest tests/unit_tests/document_loaders/test_oracleadb_loader.py
 
 Authors:
     - Diego Ascencio (diegoascencioqa)
@@ -27,7 +27,7 @@ Authors:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.documents import Document
@@ -46,6 +46,7 @@ PATCH_TARGET = "langchain_oracledb.document_loaders.oracleadb_loader.oracledb"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_loader(
     query="SELECT * FROM T",
@@ -95,8 +96,8 @@ def make_mock_oracledb(rows, columns):
 # Constructor
 # ===========================================================================
 
-class TestConstructor:
 
+class TestConstructor:
     def test_query_stored(self):
         loader = make_loader(query="SELECT 1 FROM DUAL")
         assert loader.query == "SELECT 1 FROM DUAL"
@@ -163,8 +164,8 @@ class TestConstructor:
 # _run_query — connection parameters
 # ===========================================================================
 
-class TestRunQueryConnection:
 
+class TestRunQueryConnection:
     def test_connects_with_user_password_dsn(self):
         loader = make_loader(user="scott", password="tiger", dsn="mydb")
         mock_db, conn, cursor = make_mock_oracledb([], [])
@@ -242,8 +243,8 @@ class TestRunQueryConnection:
 # _run_query — query execution
 # ===========================================================================
 
-class TestRunQueryExecution:
 
+class TestRunQueryExecution:
     def test_executes_query_without_params(self):
         loader = make_loader(query="SELECT * FROM T", parameter=None)
         mock_db, conn, cursor = make_mock_oracledb([], [])
@@ -256,7 +257,9 @@ class TestRunQueryExecution:
         mock_db, conn, cursor = make_mock_oracledb([], [])
         with patch(PATCH_TARGET, mock_db):
             loader._run_query()
-        cursor.execute.assert_called_once_with("SELECT * FROM T WHERE ID=:id", {"id": 1})
+        cursor.execute.assert_called_once_with(
+            "SELECT * FROM T WHERE ID=:id", {"id": 1}
+        )
 
     def test_executes_query_with_list_params(self):
         loader = make_loader(query="SELECT * FROM T WHERE ID=:1", parameter=[42])
@@ -336,13 +339,11 @@ class TestRunQueryExecution:
 # load
 # ===========================================================================
 
-class TestLoad:
 
+class TestLoad:
     def test_returns_list_of_documents(self):
         loader = make_loader()
-        mock_db, conn, cursor = make_mock_oracledb(
-            rows=[("Alice",)], columns=["NAME"]
-        )
+        mock_db, conn, cursor = make_mock_oracledb(rows=[("Alice",)], columns=["NAME"])
         with patch(PATCH_TARGET, mock_db):
             docs = loader.load()
         assert isinstance(docs, list)

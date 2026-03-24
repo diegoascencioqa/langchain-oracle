@@ -15,7 +15,6 @@ Covers:
 - get_summary(Document) and consistency with str input
 - get_summary(List[str]) and get_summary(List[Document]) count and type checks
 - Invalid inputs raising (bad provider, bad glevel, negative numParagraphs, wrong types)
-- Known source bugs documented (off-by-one in list mode, UnboundLocalError on empty list)
 - Functional summary quality (shorter than input, repeatability, str vs Document parity)
 
 Required environment variables:
@@ -46,7 +45,7 @@ from langchain_oracledb.utilities.oracleai import OracleSummary
 
 USERNAME = os.environ.get("VECDB_USER")
 PASSWORD = os.environ.get("VECDB_PASS")
-DSN      = os.environ.get("VECDB_HOST")
+DSN = os.environ.get("VECDB_HOST")
 
 # ---------------------------------------------------------------------------
 # Skip entire module if env vars missing or DB unreachable
@@ -85,6 +84,7 @@ SAMPLE_DOC = (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def connection():
     conn = oracledb.connect(user=USERNAME, password=PASSWORD, dsn=DSN)
@@ -96,7 +96,12 @@ def connection():
 def summarizer(connection):
     return OracleSummary(
         conn=connection,
-        params={"provider": "database", "glevel": "S", "numParagraphs": 1, "language": "english"},
+        params={
+            "provider": "database",
+            "glevel": "S",
+            "numParagraphs": 1,
+            "language": "english",
+        },
     )
 
 
@@ -104,8 +109,8 @@ def summarizer(connection):
 # Integration — constructor and basic wiring
 # ===========================================================================
 
-class TestOracleSummaryConstructor:
 
+class TestOracleSummaryConstructor:
     def test_conn_stored(self, connection):
         s = OracleSummary(conn=connection, params={"provider": "database"})
         assert s.conn is connection
@@ -128,8 +133,8 @@ class TestOracleSummaryConstructor:
 # Integration — get_summary(None)
 # ===========================================================================
 
-class TestGetSummaryNone:
 
+class TestGetSummaryNone:
     def test_none_returns_empty_list(self, summarizer):
         assert summarizer.get_summary(None) == []
 
@@ -138,8 +143,8 @@ class TestGetSummaryNone:
 # Integration — get_summary(str)
 # ===========================================================================
 
-class TestGetSummaryStr:
 
+class TestGetSummaryStr:
     def test_str_returns_list_of_one(self, summarizer):
         result = summarizer.get_summary(SAMPLE_DOC)
         assert isinstance(result, list)
@@ -171,7 +176,12 @@ class TestGetSummaryStr:
     def test_glevel_paragraph(self, connection):
         s = OracleSummary(
             conn=connection,
-            params={"provider": "database", "glevel": "paragraph", "numParagraphs": 2, "language": "english"},
+            params={
+                "provider": "database",
+                "glevel": "paragraph",
+                "numParagraphs": 2,
+                "language": "english",
+            },
         )
         result = s.get_summary(SAMPLE_DOC)
         assert len(result) == 1
@@ -197,7 +207,12 @@ class TestGetSummaryStr:
     def test_glevel_S_abbreviation(self, connection):
         s = OracleSummary(
             conn=connection,
-            params={"provider": "database", "glevel": "S", "numParagraphs": 16, "language": "english"},
+            params={
+                "provider": "database",
+                "glevel": "S",
+                "numParagraphs": 16,
+                "language": "english",
+            },
         )
         result = s.get_summary(SAMPLE_DOC)
         assert len(result) == 1
@@ -207,8 +222,8 @@ class TestGetSummaryStr:
 # Integration — get_summary(Document)
 # ===========================================================================
 
-class TestGetSummaryDocument:
 
+class TestGetSummaryDocument:
     def test_document_returns_list_of_one(self, summarizer):
         doc = Document(page_content=SAMPLE_DOC)
         result = summarizer.get_summary(doc)
@@ -238,18 +253,25 @@ class TestGetSummaryDocument:
 # Integration — get_summary(List[str])
 # ===========================================================================
 
-class TestGetSummaryListStr:
 
+class TestGetSummaryListStr:
     def test_list_str_two_items_returns_two_results(self, connection):
         """Each item in the list must produce an independent summary."""
         s = OracleSummary(
             conn=connection,
             params={"provider": "database", "glevel": "S"},
         )
-        result = s.get_summary([SAMPLE_DOC, SAMPLE_DOC])
+        docs = [
+            "The cat sat on the windowsill watching the rain.",
+            "The rocket launched at dawn and cleared the clouds.",
+        ]
+        result = s.get_summary(docs)
+        expected = [s.get_summary(doc)[0] for doc in docs]
         assert isinstance(result, list)
         assert len(result) == 2
         assert all(isinstance(r, str) for r in result)
+        assert result == expected
+        assert result[0] != result[1]
 
     def test_list_str_single_item(self, connection):
         s = OracleSummary(
@@ -266,19 +288,25 @@ class TestGetSummaryListStr:
 # Integration — get_summary(List[Document])
 # ===========================================================================
 
-class TestGetSummaryListDocument:
 
+class TestGetSummaryListDocument:
     def test_list_document_two_items_returns_two_results(self, connection):
         """Each Document in the list must produce an independent summary."""
         s = OracleSummary(
             conn=connection,
             params={"provider": "database", "glevel": "S"},
         )
-        docs = [Document(page_content=SAMPLE_DOC), Document(page_content=SAMPLE_DOC)]
+        docs = [
+            Document(page_content="Mars is the fourth planet from the Sun."),
+            Document(page_content="Bananas are rich in potassium and fiber."),
+        ]
         result = s.get_summary(docs)
+        expected = [s.get_summary(doc)[0] for doc in docs]
         assert isinstance(result, list)
         assert len(result) == 2
         assert all(isinstance(r, str) for r in result)
+        assert result == expected
+        assert result[0] != result[1]
 
     def test_list_document_single_item(self, connection):
         s = OracleSummary(
@@ -295,17 +323,21 @@ class TestGetSummaryListDocument:
 # Integration — invalid inputs raise
 # ===========================================================================
 
-class TestGetSummaryInvalidInputs:
 
+class TestGetSummaryInvalidInputs:
     def test_invalid_provider_raises(self, connection):
         """Missing value for PROVIDER"""
-        s = OracleSummary(conn=connection, params={"provider": "database1", "glevel": "S"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database1", "glevel": "S"}
+        )
         with pytest.raises(Exception):
             s.get_summary(SAMPLE_DOC)
 
     def test_invalid_glevel_raises(self, connection):
         """Invalid gist level"""
-        s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "INVALID"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database", "glevel": "INVALID"}
+        )
         with pytest.raises(Exception):
             s.get_summary(SAMPLE_DOC)
 
@@ -319,32 +351,41 @@ class TestGetSummaryInvalidInputs:
             s.get_summary(SAMPLE_DOC)
 
     def test_int_input_raises(self, connection):
-        s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "S"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database", "glevel": "S"}
+        )
         with pytest.raises(Exception, match="Invalid input type"):
             s.get_summary(42)
 
     def test_dict_input_raises(self, connection):
-        s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "S"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database", "glevel": "S"}
+        )
         with pytest.raises(Exception, match="Invalid input type"):
             s.get_summary({"text": SAMPLE_DOC})
 
     def test_list_with_invalid_item_raises(self, connection):
-        s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "S"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database", "glevel": "S"}
+        )
         with pytest.raises(Exception, match="Invalid input type"):
             s.get_summary([SAMPLE_DOC, 42])
 
     def test_empty_list_returns_empty_list(self, connection):
         """Empty list input must return an empty list without raising."""
-        s = OracleSummary(conn=connection, params={"provider": "database", "glevel": "S"})
+        s = OracleSummary(
+            conn=connection, params={"provider": "database", "glevel": "S"}
+        )
         result = s.get_summary([])
         assert result == []
+
 
 # ===========================================================================
 # Functional — summary quality
 # ===========================================================================
 
-class TestFunctionalSummaryQuality:
 
+class TestFunctionalSummaryQuality:
     def test_summary_is_shorter_than_input(self, summarizer):
         result = summarizer.get_summary(SAMPLE_DOC)
         assert len(result[0]) < len(SAMPLE_DOC)

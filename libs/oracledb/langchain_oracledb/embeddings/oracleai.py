@@ -67,6 +67,7 @@ class OracleEmbeddings(BaseModel, Embeddings):
             model_name: Name of the model.
         """
 
+        cursor = None
         try:
             if conn is None or dir is None or onnx_file is None or model_name is None:
                 raise Exception("Invalid input")
@@ -91,7 +92,8 @@ class OracleEmbeddings(BaseModel, Embeddings):
         except Exception as ex:
             logger.info(f"An exception occurred :: {ex}")
             traceback.print_exc()
-            cursor.close()
+            if cursor is not None:
+                cursor.close()
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:

@@ -8,9 +8,11 @@ without any real database connection. All DB interactions are intercepted
 via mock conn and cursor objects at exact call sites.
 
 Covers:
-- Constructor attribute storage and defaults (conn, params, proxy, extra field rejection)
+- Constructor attribute storage and defaults
+    (conn, params, proxy, extra field rejection)
 - load_onnx_model PL/SQL execution, bind variable correctness, and cursor cleanup
-- load_onnx_model None input validation (None conn, dir, onnx file, model name all raise)
+- load_onnx_model None input validation
+    (None conn, dir, onnx file, model name all raise)
 - embed_documents output shape, vector parsing, and multi-text batching
 - embed_documents internals (fetch_lobs flag, setinputsizes, utl_to_embeddings SQL,
   SYS.VECTOR_ARRAY_T type fetch, chunk id and data construction)
@@ -19,7 +21,7 @@ Covers:
 - embed_query delegation to embed_documents and correct result unwrapping
 
 Run:
-    pytest tests/unit_tests/embeddings/test_oracledb_embeddings.py 
+    pytest tests/unit_tests/embeddings/test_oracledb_embeddings.py
 
 Authors:
     - Diego Ascencio (diegoascencioqa)
@@ -28,16 +30,17 @@ Authors:
 from __future__ import annotations
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
 
 import oracledb
-from langchain_oracledb.embeddings.oracleai import OracleEmbeddings
+import pytest
 
+from langchain_oracledb.embeddings.oracleai import OracleEmbeddings
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def make_conn(rows=None, execute_side_effect=None):
     """Return (mock_conn, mock_cursor) with optional row iteration and
@@ -69,10 +72,12 @@ def make_embedder(conn, params=None, proxy=None):
 
 def embed_row(chunk_id: int, vector: list) -> tuple:
     """Build a fake cursor row matching Oracle's utl_to_embeddings output."""
-    payload = json.dumps({
-        "embed_id": chunk_id,
-        "embed_vector": json.dumps(vector),
-    })
+    payload = json.dumps(
+        {
+            "embed_id": chunk_id,
+            "embed_vector": json.dumps(vector),
+        }
+    )
     return (payload,)
 
 
@@ -80,8 +85,8 @@ def embed_row(chunk_id: int, vector: list) -> tuple:
 # Constructor
 # ===========================================================================
 
-class TestConstructor:
 
+class TestConstructor:
     def test_basic_construction(self):
         conn, cursor = make_conn()
         embedder = make_embedder(conn)
@@ -119,8 +124,8 @@ class TestConstructor:
 # load_onnx_model
 # ===========================================================================
 
-class TestLoadOnnxModel:
 
+class TestLoadOnnxModel:
     def test_executes_plsql_block(self):
         conn, cursor = make_conn()
         OracleEmbeddings.load_onnx_model(conn, "MY_DIR", "model.onnx", "MY_MODEL")
@@ -178,8 +183,8 @@ class TestLoadOnnxModel:
 # embed_documents
 # ===========================================================================
 
-class TestEmbedDocuments:
 
+class TestEmbedDocuments:
     def test_returns_list_of_lists(self):
         conn, _ = make_conn(rows=[embed_row(1, [0.1, 0.2, 0.3])])
         embedder = make_embedder(conn)
@@ -323,8 +328,8 @@ class TestEmbedDocuments:
 # embed_query
 # ===========================================================================
 
-class TestEmbedQuery:
 
+class TestEmbedQuery:
     def test_returns_single_list(self):
         vector = [0.5, 0.6, 0.7]
         conn, _ = make_conn(rows=[embed_row(1, vector)])
@@ -338,8 +343,9 @@ class TestEmbedQuery:
         """embed_query must call embed_documents(["text"]) and return result[0]."""
         conn, cursor = make_conn()
         embedder = make_embedder(conn)
-        with patch.object(OracleEmbeddings, "embed_documents",
-                          return_value=[[0.1, 0.2]]) as mock_embed:
+        with patch.object(
+            OracleEmbeddings, "embed_documents", return_value=[[0.1, 0.2]]
+        ) as mock_embed:
             result = embedder.embed_query("test input")
         mock_embed.assert_called_once_with(["test input"])
         assert result == [0.1, 0.2]

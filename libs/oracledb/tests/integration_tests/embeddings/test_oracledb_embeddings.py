@@ -21,7 +21,7 @@ Required environment variables:
     VECDB_PASS   — database password
 
 Run:
-    pytest tests/integration_tests/embeddings/test_oracledb_embeddings.py 
+    pytest tests/integration_tests/embeddings/test_oracledb_embeddings.py
 
 Assumption:
     The allminilm model is pre-installed in the database by the infrastructure
@@ -51,7 +51,7 @@ from langchain_oracledb import OracleEmbeddings
 
 USERNAME = os.environ.get("VECDB_USER")
 PASSWORD = os.environ.get("VECDB_PASS")
-DSN      = os.environ.get("VECDB_HOST")
+DSN = os.environ.get("VECDB_HOST")
 
 # ---------------------------------------------------------------------------
 # Skip entire module if env vars are missing or DB is unreachable
@@ -75,8 +75,9 @@ except Exception as e:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def cosine_similarity(a: list, b: list) -> float:
-    dot  = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
     return dot / (norm_a * norm_b)
@@ -85,6 +86,7 @@ def cosine_similarity(a: list, b: list) -> float:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def connection():
@@ -109,8 +111,8 @@ def embedder(connection):
 # the standard Embeddings interface contract automatically.
 # ===========================================================================
 
-class TestOracleEmbeddingsStandard(EmbeddingsIntegrationTests):
 
+class TestOracleEmbeddingsStandard(EmbeddingsIntegrationTests):
     @property
     def embeddings_class(self) -> Type[OracleEmbeddings]:
         return OracleEmbeddings
@@ -118,7 +120,10 @@ class TestOracleEmbeddingsStandard(EmbeddingsIntegrationTests):
     @property
     def embedding_model_params(self) -> dict:
         conn = oracledb.connect(user=USERNAME, password=PASSWORD, dsn=DSN)
-        return {"conn": conn, "params": {"provider": "database", "model": "allminilm"}}
+        return {
+            "conn": conn,
+            "params": {"provider": "database", "model": "allminilm"},
+        }
 
 
 # ===========================================================================
@@ -126,8 +131,8 @@ class TestOracleEmbeddingsStandard(EmbeddingsIntegrationTests):
 # Verifies constructor and param handling against a real connection.
 # ===========================================================================
 
-class TestEmbedDocumentsValidation:
 
+class TestEmbedDocumentsValidation:
     def test_missing_provider_uses_oracle_default(self, connection):
         """This documents provider behaviour:  is optional."""
         embedder = OracleEmbeddings(
@@ -159,8 +164,8 @@ class TestEmbedDocumentsValidation:
 # Integration — embed_documents output shape and type
 # ===========================================================================
 
-class TestEmbedDocumentsOutput:
 
+class TestEmbedDocumentsOutput:
     def test_returns_list_of_lists(self, embedder):
         result = embedder.embed_documents(["hello world"])
         assert isinstance(result, list)
@@ -240,8 +245,8 @@ class TestEmbedDocumentsOutput:
 # Integration — embed_query output shape and type
 # ===========================================================================
 
-class TestEmbedQueryOutput:
 
+class TestEmbedQueryOutput:
     def test_returns_flat_list_of_floats(self, embedder):
         result = embedder.embed_query("hello world")
         assert isinstance(result, list)
@@ -274,17 +279,19 @@ class TestEmbedQueryOutput:
 # Verifies that Oracle's embeddings reflect actual semantic meaning.
 # ===========================================================================
 
-class TestFunctionalSemanticSimilarity:
 
+class TestFunctionalSemanticSimilarity:
     def test_similar_texts_closer_than_unrelated(self, embedder):
         """Semantically similar texts must produce vectors closer to each other
         than to an unrelated text."""
-        results = embedder.embed_documents([
-            "The cat sat on the mat",
-            "A cat is sitting on a mat",
-            "Quantum mechanics describes subatomic particles",
-        ])
-        sim_related   = cosine_similarity(results[0], results[1])
+        results = embedder.embed_documents(
+            [
+                "The cat sat on the mat",
+                "A cat is sitting on a mat",
+                "Quantum mechanics describes subatomic particles",
+            ]
+        )
+        sim_related = cosine_similarity(results[0], results[1])
         sim_unrelated = cosine_similarity(results[0], results[2])
         assert sim_related > sim_unrelated
 
@@ -319,8 +326,8 @@ class TestFunctionalSemanticSimilarity:
 # Functional — load_onnx_model input validation (real DB, no ONNX file needed)
 # ===========================================================================
 
-class TestFunctionalLoadOnnxModelValidation:
 
+class TestFunctionalLoadOnnxModelValidation:
     def test_none_conn_raises(self, connection):
         """None conn must raise Exception with 'Invalid input' message."""
         with pytest.raises(Exception, match="Invalid input"):
@@ -353,8 +360,8 @@ class TestFunctionalLoadOnnxModelValidation:
 # Functional — pipeline (real DB, embedder used end to end)
 # ===========================================================================
 
-class TestFunctionalPipeline:
 
+class TestFunctionalPipeline:
     def test_embed_then_find_nearest(self, embedder):
         """Embed a corpus, embed a query, find the nearest doc by cosine similarity."""
         corpus = [
@@ -366,7 +373,7 @@ class TestFunctionalPipeline:
         query = "What is the capital of Germany?"
 
         corpus_vecs = embedder.embed_documents(corpus)
-        query_vec   = embedder.embed_query(query)
+        query_vec = embedder.embed_query(query)
 
         similarities = [cosine_similarity(query_vec, cv) for cv in corpus_vecs]
         best = similarities.index(max(similarities))
@@ -374,8 +381,8 @@ class TestFunctionalPipeline:
 
     def test_embed_documents_then_embed_query_consistent_dims(self, embedder):
         """Vectors from embed_documents and embed_query must have the same length."""
-        doc_vecs   = embedder.embed_documents(["first doc", "second doc"])
-        query_vec  = embedder.embed_query("a query")
+        doc_vecs = embedder.embed_documents(["first doc", "second doc"])
+        query_vec = embedder.embed_query("a query")
         assert all(len(dv) == len(query_vec) for dv in doc_vecs)
 
     def test_repeated_embed_same_result(self, embedder):
