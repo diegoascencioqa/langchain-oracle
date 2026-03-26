@@ -31,9 +31,9 @@ from langchain_oracledb.vectorstores.utils import (
     drop_table_purge,
 )
 
-username = "vector_user"
-password = "Linux1234#Solaris1234#"
-dsn = "cdb1_pdb1"
+username = ""
+password = ""
+dsn = ""
 
 # Attempt a quick connection to determine whether to skip all tests
 try:
