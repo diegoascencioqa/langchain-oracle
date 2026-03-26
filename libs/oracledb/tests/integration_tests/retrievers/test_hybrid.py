@@ -13,7 +13,7 @@ from typing import Any, Dict, Tuple
 
 import oracledb
 import pytest
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores.utils import DistanceStrategy
 
 from langchain_oracledb.embeddings import OracleEmbeddings
