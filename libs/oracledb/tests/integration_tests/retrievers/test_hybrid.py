@@ -8,6 +8,7 @@ with OracleVS.
 """
 
 # import required modules
+import os
 import uuid
 from typing import Any, Dict, Tuple
 
@@ -31,9 +32,9 @@ from langchain_oracledb.vectorstores.utils import (
 )
 
 # Connection details for tests
-username = ""
-password = ""
-dsn = ""
+username = os.environ.get("VECDB_USER")
+password = os.environ.get("VECDB_PASS")
+dsn = os.environ.get("VECDB_HOST")
 
 # Attempt a quick connection to determine whether to skip all tests
 try:
@@ -202,7 +203,10 @@ def three_doc_texts_and_metadatas() -> Tuple[list[str], list[dict]]:
 # Shared helper
 # -------------------------
 
-def _build_vs_and_index(connection, resource_names, db_embedder_params, texts, metadatas):
+
+def _build_vs_and_index(
+    connection, resource_names, db_embedder_params, texts, metadatas
+):
     """Create OracleVS, preference, and hybrid index. Returns (vs, pref)."""
     proxy = ""
     model = OracleEmbeddings(conn=connection, params=db_embedder_params, proxy=proxy)
@@ -1039,8 +1043,13 @@ async def test_hybrid_score_weight_effects_async(
 # Idempotency
 # -------------------------
 
+
 def test_create_hybrid_index_repeatable(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Calling create_hybrid_index twice on the same index must not raise
     and retrieval must still return correct results."""
@@ -1060,7 +1069,11 @@ def test_create_hybrid_index_repeatable(
 
 
 def test_drop_and_recreate_preference(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """drop_preference followed by create_preference and index rebuild must
     leave the index in a working state."""
@@ -1096,6 +1109,7 @@ def test_drop_and_recreate_preference(
 # -------------------------
 # Async vector_store shortcut
 # -------------------------
+
 
 @pytest.mark.asyncio
 async def test_acreate_hybrid_index_async_vector_store_shortcut(
@@ -1135,8 +1149,13 @@ async def test_acreate_hybrid_index_async_vector_store_shortcut(
 # Optional DDL clauses
 # -------------------------
 
+
 def test_create_hybrid_index_with_parallel(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """PARALLEL N clause must be accepted by Oracle and retrieval must work."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1170,8 +1189,13 @@ def test_create_hybrid_index_with_parallel(
 # k override at call time
 # -------------------------
 
+
 def test_hybrid_retriever_k_override_at_invoke(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """k passed at retriever.invoke() call time must override the constructor k."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1190,8 +1214,13 @@ def test_hybrid_retriever_k_override_at_invoke(
 # k larger than document count
 # -------------------------
 
+
 def test_hybrid_k_larger_than_doc_count(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Requesting more results than documents must return all available
     without raising."""
@@ -1249,8 +1278,13 @@ async def test_hybrid_k_larger_than_doc_count_async(
 # against empty strings before hitting the DB.
 # -------------------------
 
+
 def test_hybrid_empty_query_raises(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """An empty query string raises ORA-20000/DRG-11003 from Oracle.
     This documents a known source-code gap: the retriever does not guard
@@ -1306,8 +1340,14 @@ async def test_hybrid_empty_query_raises_async(
 # ConnectionPool as client
 # -------------------------
 
+
 def test_create_hybrid_index_with_pool(
-    pool, connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    pool,
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """create_hybrid_index must work when client is a ConnectionPool."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1334,7 +1374,12 @@ def test_create_hybrid_index_with_pool(
 
 
 def test_hybrid_retrieval_with_pool_in_vs(
-    pool, connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    pool,
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """OracleHybridSearchRetriever must work when OracleVS.client is a pool."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1365,8 +1410,13 @@ def test_hybrid_retrieval_with_pool_in_vs(
 # Score descending ordering
 # -------------------------
 
+
 def test_hybrid_scores_descending(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Scores returned by hybrid retrieval must be in descending order."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1389,7 +1439,11 @@ def test_hybrid_scores_descending(
 
 
 def test_semantic_scores_descending(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Vector scores from semantic mode must be in descending order."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1412,7 +1466,11 @@ def test_semantic_scores_descending(
 
 
 def test_keyword_scores_descending(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Text scores from keyword mode must be in descending order."""
     texts, metadatas = three_doc_texts_and_metadatas

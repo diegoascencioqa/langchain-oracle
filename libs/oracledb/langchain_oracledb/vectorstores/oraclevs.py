@@ -987,11 +987,11 @@ class OracleVS(VectorStore):
 
             from langchain_oracledb.vectorstores import OracleVS
             from langchain.embeddings.openai import OpenAIEmbeddings
+            import os
             import oracledb
 
-            with oracledb.connect(user = user, password = pwd, dsn = dsn) as
-            connection:
-                print ("Database version:", connection.version)
+            with oracledb.connect(dsn=os.environ["ORACLE_DB_DSN"]) as connection:
+                print("Database version:", connection.version)
                 embeddings = OpenAIEmbeddings()
                 query = ""
                 vectors = OracleVS(connection, embeddings, table_name, query)

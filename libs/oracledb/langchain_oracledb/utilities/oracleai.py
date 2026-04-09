@@ -173,11 +173,10 @@ class OracleSummary:
 """
 # A sample unit test.
 
+import os
+
 ''' get the Oracle connection '''
-conn = oracledb.connect(
-    user="",
-    password="",
-    dsn="")
+conn = oracledb.connect(dsn=os.environ["ORACLE_DB_DSN"])
 print("Oracle connection is established...")
 
 ''' params '''

@@ -1,3 +1,4 @@
+import os
 from collections.abc import Generator
 from typing import AsyncGenerator
 
@@ -11,9 +12,9 @@ from langchain_oracledb import OracleVS
 from langchain_oracledb.embeddings import OracleEmbeddings
 from langchain_oracledb.vectorstores.oraclevs import adrop_table_purge, drop_table_purge
 
-username = ""
-password = ""
-dsn = ""
+username = os.environ.get("VECDB_USER")
+password = os.environ.get("VECDB_PASS")
+dsn = os.environ.get("VECDB_HOST")
 
 try:
     oracledb.connect(user=username, password=password, dsn=dsn)

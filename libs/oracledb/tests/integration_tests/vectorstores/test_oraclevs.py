@@ -10,6 +10,7 @@ with OracleVS.
 # import required modules
 import asyncio
 import logging
+import os
 import sys
 import threading
 from typing import Union
@@ -39,9 +40,9 @@ from langchain_oracledb.vectorstores.oraclevs import (
     drop_table_purge,
 )
 
-username = ""
-password = ""
-dsn = ""
+username = os.environ.get("VECDB_USER")
+password = os.environ.get("VECDB_PASS")
+dsn = os.environ.get("VECDB_HOST")
 
 try:
     oracledb.connect(user=username, password=password, dsn=dsn)

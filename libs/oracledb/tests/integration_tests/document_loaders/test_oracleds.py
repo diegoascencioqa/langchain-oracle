@@ -9,6 +9,7 @@ Authors:
     - Sudhir Kumar (sudhirkk)
 """
 
+import os
 import sys
 
 import oracledb
@@ -24,9 +25,9 @@ from langchain_oracledb.vectorstores.oraclevs import (
     drop_table_purge,
 )
 
-uname = ""
-passwd = ""
-v_dsn = ""
+uname = os.environ.get("VECDB_USER")
+passwd = os.environ.get("VECDB_PASS")
+v_dsn = os.environ.get("VECDB_HOST")
 
 try:
     oracledb.connect(user=uname, password=passwd, dsn=v_dsn)

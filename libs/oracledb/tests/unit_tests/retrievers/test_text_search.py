@@ -30,8 +30,7 @@ Authors:
 """
 
 import logging
-import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,10 +41,10 @@ from langchain_oracledb.retrievers.text_search import (
 )
 from langchain_oracledb.vectorstores.oraclevs import OracleVS
 
-
 # ---------------------------------------------------------------------------
 # _generate_accum_query
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateAccumQuery:
     """Tests for the _generate_accum_query pure function."""
@@ -130,9 +129,11 @@ class TestGenerateAccumQuery:
         result = _generate_accum_query("refund\tpolicy")
         assert result == '"refund" ACCUM "policy"'
 
+
 # ---------------------------------------------------------------------------
 # _get_text_index_ddl
 # ---------------------------------------------------------------------------
+
 
 class TestGetTextIndexDdl:
     """Tests for the _get_text_index_ddl helper."""
@@ -168,11 +169,15 @@ class TestGetTextIndexDdl:
     # --- Error cases ---
     def test_both_vector_store_and_table_name_raises(self):
         vs = self._make_vs()
-        with pytest.raises(ValueError, match="Only give one of vector_store or table_name"):
+        with pytest.raises(
+            ValueError, match="Only give one of vector_store or table_name"
+        ):
             _get_text_index_ddl('"IDX"', vs, "OTHER_TABLE")
 
     def test_neither_vector_store_nor_table_name_raises(self):
-        with pytest.raises(ValueError, match="Provide either vector_store or table_name"):
+        with pytest.raises(
+            ValueError, match="Provide either vector_store or table_name"
+        ):
             _get_text_index_ddl('"IDX"', None, None)
 
     def test_vector_store_with_non_text_column_raises(self):
@@ -224,7 +229,9 @@ class TestOracleTextSearchRetrieverValidation:
     # --- Mutual exclusivity ---
     def test_both_vector_store_and_table_name_raises(self):
         vs = self._make_vs()
-        with pytest.raises(ValueError, match="Only give one of vector_store or table_name"):
+        with pytest.raises(
+            ValueError, match="Only give one of vector_store or table_name"
+        ):
             OracleTextSearchRetriever(
                 vector_store=vs,
                 client=MagicMock(),
@@ -233,7 +240,9 @@ class TestOracleTextSearchRetrieverValidation:
             )
 
     def test_neither_vector_store_nor_table_name_raises(self):
-        with pytest.raises(ValueError, match="Provide either vector_store or table_name"):
+        with pytest.raises(
+            ValueError, match="Provide either vector_store or table_name"
+        ):
             OracleTextSearchRetriever()
 
     def test_table_name_without_client_raises(self):
@@ -291,7 +300,8 @@ class TestOracleTextSearchRetrieverValidation:
         assert "title" in r.returned_columns
 
     def test_returned_columns_defaults_to_metadata_for_vs(self):
-        """When vector_store is used and returned_columns is None, default to ['metadata']."""
+        """When vector_store is used and returned_columns is None,
+        default to ['metadata']."""
         vs = self._make_vs()
         r = OracleTextSearchRetriever(vector_store=vs)
         assert r.returned_columns == ["metadata"]

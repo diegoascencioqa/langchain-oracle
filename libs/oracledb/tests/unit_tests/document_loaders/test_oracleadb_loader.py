@@ -1,22 +1,10 @@
 # Copyright (c) 2024, 2025 Oracle and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl/
-"""
-unit_tests/document_loaders/test_oracleadb_loader.py
+"""Unit tests for OracleAutonomousDatabaseLoader with patched DB calls.
 
 Unit tests for OracleAutonomousDatabaseLoader, exercising the full loader
 contract without any real database connection. All calls to oracledb.connect
 are patched at the module level.
-
-Covers:
-- Constructor attribute storage and defaults (query, user, password, dsn, schema,
-  config_dir, wallet_location, wallet_password, metadata, parameter)
-- _run_query connection parameter handling (config_dir, wallet, schema, cleanup)
-- _run_query execution (with and without parameters, list vs dict params)
-- LOB value resolution via .read()
-- Row-to-dict mapping from cursor.description
-- Database connection errors propagated with cleanup
-- load() -> List[Document] with correct page_content, metadata extraction,
-  multiple metadata columns, and empty result handling
 
 Run:
     pytest tests/unit_tests/document_loaders/test_oracleadb_loader.py
@@ -27,6 +15,7 @@ Authors:
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,9 +39,9 @@ PATCH_TARGET = "langchain_oracledb.document_loaders.oracleadb_loader.oracledb"
 
 def make_loader(
     query="SELECT * FROM T",
-    user="scott",
-    password="tiger",
-    dsn="mydb",
+    user=None,
+    password=None,
+    dsn=None,
     schema=None,
     config_dir=None,
     wallet_location=None,
@@ -60,6 +49,12 @@ def make_loader(
     metadata=None,
     parameter=None,
 ):
+    if user is None:
+        user = f"user_{uuid.uuid4().hex[:8]}"
+    if password is None:
+        password = uuid.uuid4().hex
+    if dsn is None:
+        dsn = f"db_{uuid.uuid4().hex[:8]}"
     return OracleAutonomousDatabaseLoader(
         query=query,
         user=user,
@@ -103,16 +98,19 @@ class TestConstructor:
         assert loader.query == "SELECT 1 FROM DUAL"
 
     def test_user_stored(self):
-        loader = make_loader(user="alice")
-        assert loader.user == "alice"
+        db_user = f"user_{uuid.uuid4().hex[:8]}"
+        loader = make_loader(user=db_user)
+        assert loader.user == db_user
 
     def test_password_stored(self):
-        loader = make_loader(password="secret")
-        assert loader.password == "secret"
+        auth_value = uuid.uuid4().hex
+        loader = make_loader(password=auth_value)
+        assert loader.password == auth_value
 
     def test_dsn_stored(self):
-        loader = make_loader(dsn="myhost/mydb")
-        assert loader.dsn == "myhost/mydb"
+        db_dsn = f"db_{uuid.uuid4().hex[:8]}"
+        loader = make_loader(dsn=db_dsn)
+        assert loader.dsn == db_dsn
 
     def test_schema_defaults_to_none(self):
         loader = make_loader()
@@ -167,15 +165,18 @@ class TestConstructor:
 
 class TestRunQueryConnection:
     def test_connects_with_user_password_dsn(self):
-        loader = make_loader(user="scott", password="tiger", dsn="mydb")
+        db_user = f"user_{uuid.uuid4().hex[:8]}"
+        auth_value = uuid.uuid4().hex
+        db_dsn = f"db_{uuid.uuid4().hex[:8]}"
+        loader = make_loader(user=db_user, password=auth_value, dsn=db_dsn)
         mock_db, conn, cursor = make_mock_oracledb([], [])
         with patch(PATCH_TARGET, mock_db):
             loader._run_query()
         mock_db.connect.assert_called_once()
         call_kwargs = mock_db.connect.call_args.kwargs
-        assert call_kwargs["user"] == "scott"
-        assert call_kwargs["password"] == "tiger"
-        assert call_kwargs["dsn"] == "mydb"
+        assert call_kwargs["user"] == db_user
+        assert call_kwargs["password"] == auth_value
+        assert call_kwargs["dsn"] == db_dsn
 
     def test_config_dir_added_when_set(self):
         loader = make_loader(config_dir="/etc/oracle/config")

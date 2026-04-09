@@ -33,8 +33,7 @@ Authors:
     - Diego Ascencio (diegoascencioqa)
 """
 
-import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -47,10 +46,10 @@ from langchain_oracledb.retrievers.hybrid_search import (
 )
 from langchain_oracledb.vectorstores.oraclevs import OracleVS
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_vs(table_name="MY_TABLE"):
     vs = MagicMock(spec=OracleVS)
@@ -58,10 +57,12 @@ def _make_vs(table_name="MY_TABLE"):
     vs.client = MagicMock()
     return vs
 
+
 def _make_embeddings(provider="database", model="allminilm"):
     emb = MagicMock(spec=OracleEmbeddings)
     emb.params = {"provider": provider, "model": model}
     return emb
+
 
 def _make_preference(vs=None, preference_name="MY_PREF"):
     pref = OracleVectorizerPreference.__new__(OracleVectorizerPreference)
@@ -70,9 +71,11 @@ def _make_preference(vs=None, preference_name="MY_PREF"):
     pref.params = None
     return pref
 
+
 # ---------------------------------------------------------------------------
 # _validate_parameters
 # ---------------------------------------------------------------------------
+
 
 class TestValidateParameters:
     """Tests for the _validate_parameters pure function."""
@@ -133,6 +136,7 @@ class TestValidateParameters:
 # _get_hybrid_index_ddl
 # ---------------------------------------------------------------------------
 
+
 class TestGetHybridIndexDdl:
     """Tests for the _get_hybrid_index_ddl helper."""
 
@@ -156,13 +160,17 @@ class TestGetHybridIndexDdl:
 
     # --- Reserved parameter keys raise ---
 
-    @pytest.mark.parametrize("reserved_key", ["model", "embedder_spec", "vectorizer", "vector_idxtype"])
+    @pytest.mark.parametrize(
+        "reserved_key", ["model", "embedder_spec", "vectorizer", "vector_idxtype"]
+    )
     def test_reserved_key_in_parameters_raises(self, reserved_key):
         pref = self._make_pref()
         with pytest.raises(ValueError, match="Vectorization parameters must be given"):
             _get_hybrid_index_ddl(pref, '"IDX"', {"parameters": {reserved_key: "val"}})
 
-    @pytest.mark.parametrize("reserved_key", ["MODEL", "EMBEDDER_SPEC", "VECTORIZER", "VECTOR_IDXTYPE"])
+    @pytest.mark.parametrize(
+        "reserved_key", ["MODEL", "EMBEDDER_SPEC", "VECTORIZER", "VECTOR_IDXTYPE"]
+    )
     def test_reserved_key_case_insensitive_raises(self, reserved_key):
         pref = self._make_pref()
         with pytest.raises(ValueError, match="Vectorization parameters must be given"):
@@ -213,9 +221,7 @@ class TestGetHybridIndexDdl:
 
     def test_extra_parameters_are_included(self):
         pref = self._make_pref()
-        ddl = _get_hybrid_index_ddl(
-            pref, '"IDX"', {"parameters": {"word_min_len": 2}}
-        )
+        ddl = _get_hybrid_index_ddl(pref, '"IDX"', {"parameters": {"word_min_len": 2}})
         assert "word_min_len 2" in ddl
 
     # --- SQL injection safety: single quotes in params_str are escaped ---
@@ -227,9 +233,11 @@ class TestGetHybridIndexDdl:
         # any ' in the name must be doubled.
         assert "PREF''X" in ddl
 
+
 # ---------------------------------------------------------------------------
 # OracleHybridSearchRetriever — field_validator (no DB)
 # ---------------------------------------------------------------------------
+
 
 class TestOracleHybridSearchRetrieverValidation:
     """Tests for OracleHybridSearchRetriever Pydantic validators."""
@@ -271,7 +279,10 @@ class TestOracleHybridSearchRetrieverValidation:
     # --- params validator: top-level search_text ---
     def test_top_level_search_text_raises(self):
         vs = _make_vs()
-        with pytest.raises(ValueError, match="Cannot provide search_text as a parameter at the top level"):
+        with pytest.raises(
+            ValueError,
+            match="Cannot provide search_text as a parameter at the top level",
+        ):
             OracleHybridSearchRetriever(
                 vector_store=vs, idx_name="IDX", params={"search_text": "bad"}
             )
@@ -335,6 +346,7 @@ class TestOracleHybridSearchRetrieverValidation:
 # ---------------------------------------------------------------------------
 # OracleHybridSearchRetriever._get_search_params
 # ---------------------------------------------------------------------------
+
 
 class TestGetSearchParams:
     """Tests for _get_search_params — the JSON parameter builder."""
@@ -413,7 +425,10 @@ class TestGetSearchParams:
     # --- call-time invalid params still raise ---
     def test_call_time_search_text_at_top_level_raises(self):
         r = self._make_retriever()
-        with pytest.raises(ValueError, match="Cannot provide search_text as a parameter at the top level"):
+        with pytest.raises(
+            ValueError,
+            match="Cannot provide search_text as a parameter at the top level",
+        ):
             r._get_search_params("q", params={"search_text": "bad"})
 
     def test_call_time_return_key_raises(self):
@@ -437,9 +452,11 @@ class TestGetSearchParams:
         p = r._get_search_params("q")
         assert p["return"]["topN"] == 4  # hard-coded fallback in the method
 
+
 # ---------------------------------------------------------------------------
 # OracleVectorizerPreference._get_preference_parameters
 # ---------------------------------------------------------------------------
+
 
 class TestGetPreferenceParameters:
     """Tests for _get_preference_parameters (no DB calls)."""

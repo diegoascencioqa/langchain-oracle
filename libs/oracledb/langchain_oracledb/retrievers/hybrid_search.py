@@ -124,11 +124,15 @@ class OracleVectorizerPreference:
             create_hybrid_index,
             OracleHybridSearchRetriever,
         )
+        import os
         import oracledb
 
         # Connect and prepare embeddings and vector store
-        client = oracledb.connect(user="scott", password="tiger", dsn="dbhost/service")
+        client = oracledb.connect(
+            dsn=os.environ["ORACLE_DB_DSN"]
+        )
         embeddings = OracleEmbeddings(
+            conn=client,
             params={
                 "provider": "database",
                 "model": "DB_MODEL"
@@ -156,26 +160,6 @@ class OracleVectorizerPreference:
 
         # Cleanup when needed
         pref.drop_preference()
-
-    Example:
-        Async usage
-
-        import asyncio
-
-        async def main():
-            async_client = dict(user="scott", password="tiger", dsn="dbhost/service")  # accepted by _aget_connection
-            embeddings = OracleEmbeddings(params={"provider": "database", "model": "YOUR_DB_MODEL"})
-            vs = OracleVS(client=async_client, table_name="DOCS", embedding_function=embeddings)
-
-            pref = await OracleVectorizerPreference.acreate_preference(vs, preference_name="PREF_DOCS_A")
-            await acreate_hybrid_index(async_client, "IDX_DOCS_HYB_A", pref)
-
-            retriever = OracleHybridSearchRetriever(vector_store=vs, idx_name="IDX_DOCS_HYB_A", k=3)
-            results = await retriever.ainvoke("latest SLA")
-
-            await pref.adrop_preference()
-
-        asyncio.run(main())
     """  # noqa E501
 
     params: Optional[dict[str, Any]]
@@ -184,7 +168,7 @@ class OracleVectorizerPreference:
 
     PREFERENCE_STR = """
     begin
-    DBMS_VECTOR_CHAIN.CREATE_PREFERENCE(
+    dbms_vector_chain.CREATE_PREFERENCE(
         :1,
         dbms_vector_chain.vectorizer,
         json(:2));
@@ -490,8 +474,7 @@ async def acreate_hybrid_index(
     Creates the HYBRID VECTOR INDEX if it does not exist, using async APIs.
 
     Args:
-        client: oracledb async connection or connection parameters
-            accepted by _aget_connection.
+        client: oracledb async connection or async connection pool.
         idx_name: Index name to create (quoted automatically).
         vectorizer_preference: Existing OracleVectorizerPreference to reference in the
             index. Mutually exclusive with vector_store.
@@ -569,7 +552,7 @@ class OracleHybridSearchRetriever(BaseRetriever):
             k=5,
             return_scores=True,
         )
-        docs = retriever.invoke("how do I reset my password?")
+        docs = retriever.invoke("how do I rotate my database credentials?")
         for d in docs:
             print(d.page_content, d.metadata.get("score"))
 

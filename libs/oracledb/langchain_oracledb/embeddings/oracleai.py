@@ -76,7 +76,7 @@ class OracleEmbeddings(BaseModel, Embeddings):
             cursor.execute(
                 """
                 begin
-                    dbms_data_mining.drop_model(model_name => :model, force => true);
+                    sys.dbms_data_mining.drop_model(model_name => :model, force => true);
                     SYS.DBMS_VECTOR.load_onnx_model(:path, :filename, :model, 
                         json('{"function" : "embedding", 
                             "embeddingOutput" : "embedding", 
@@ -162,12 +162,11 @@ class OracleEmbeddings(BaseModel, Embeddings):
 """
 # A sample unit test.
 
+import os
 import oracledb
-# get the Oracle connection 
+# get the Oracle connection
 conn = oracledb.connect(
-    user="<user>",
-    password="<password>",
-    dsn="<hostname>/<service_name>",
+    dsn=os.environ["VECDB_HOST"]
 )
 print("Oracle connection is established...")
 

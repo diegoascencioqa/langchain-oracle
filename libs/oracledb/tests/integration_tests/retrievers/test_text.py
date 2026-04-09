@@ -12,6 +12,7 @@ Covers:
 - sync and async code paths
 """
 
+import os
 import uuid
 from typing import Any, Dict, Tuple
 
@@ -31,9 +32,9 @@ from langchain_oracledb.vectorstores.utils import (
     drop_table_purge,
 )
 
-username = ""
-password = ""
-dsn = ""
+username = os.environ.get("VECDB_USER")
+password = os.environ.get("VECDB_PASS")
+dsn = os.environ.get("VECDB_HOST")
 
 # Attempt a quick connection to determine whether to skip all tests
 try:
@@ -43,6 +44,7 @@ except Exception as e:
         allow_module_level=True,
         reason=f"Database connection failed: {e}, skipping tests.",
     )
+
 
 # -------------------------
 # Fixtures for setup/teardown and common data
@@ -1084,9 +1086,11 @@ def test_text_vs_fuzzy_word(connection, cleanup, resource_names) -> None:
     docs_true = retr_true.invoke(query)
     assert len(docs_true) == 0
 
+
 # -------------------------
-# Additional fixtures 
+# Additional fixtures
 # -------------------------
+
 
 @pytest.fixture(scope="function")
 def pool():
@@ -1125,16 +1129,17 @@ def three_doc_texts_and_metadatas() -> Tuple[list[str], list[dict]]:
 
 
 # -------------------------
-# Additional helpers 
+# Additional helpers
 # -------------------------
 
-def _build_vs_with_index_3doc(connection, resource_names, db_embedder_params, texts, metadatas):
+
+def _build_vs_with_index_3doc(
+    connection, resource_names, db_embedder_params, texts, metadatas
+):
     """Helper mirroring _build_vs_with_texts but using resource_names['table_vs']
     and resource_names['index_vs'] for the new three-doc tests."""
     proxy = ""
-    model = OracleEmbeddings(
-        conn=connection, params=db_embedder_params, proxy=proxy
-    )
+    model = OracleEmbeddings(conn=connection, params=db_embedder_params, proxy=proxy)
     drop_table_purge(connection, resource_names["table_vs"])
     vs = OracleVS.from_texts(
         texts,
@@ -1158,15 +1163,22 @@ def _create_raw_table_and_index_3doc(connection, resource_names):
             "EXCEPTION WHEN OTHERS THEN NULL; END;"
         )
         cur.execute(
-            f"CREATE TABLE {resource_names['table_raw']} (title VARCHAR2(200), body CLOB)"
+            f"CREATE TABLE {resource_names['table_raw']} "
+            "(title VARCHAR2(200), body CLOB)"
         )
         cur.execute(
             f"INSERT INTO {resource_names['table_raw']}(title, body) VALUES (:1, :2)",
-            ["Tablespace", "The tablespace can be online or offline when the database is open."],
+            [
+                "Tablespace",
+                "The tablespace can be online or offline when the database is open.",
+            ],
         )
         cur.execute(
             f"INSERT INTO {resource_names['table_raw']}(title, body) VALUES (:1, :2)",
-            ["Questions", "If the answer to preceding questions about database is yes."],
+            [
+                "Questions",
+                "If the answer to preceding questions about database is yes.",
+            ],
         )
         cur.execute(
             f"INSERT INTO {resource_names['table_raw']}(title, body) VALUES (:1, :2)",
@@ -1185,8 +1197,13 @@ def _create_raw_table_and_index_3doc(connection, resource_names):
 # operator_search=True with valid Oracle Text expressions
 # -------------------------
 
+
 def test_operator_search_near_returns_correct_doc(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """operator_search=True with NEAR(...) must return the document where
     both terms appear close together."""
@@ -1209,7 +1226,11 @@ def test_operator_search_near_returns_correct_doc(
 
 
 def test_operator_search_and_returns_correct_doc(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """operator_search=True with AND must return documents containing both terms."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1273,8 +1294,13 @@ async def test_operator_search_near_async(
 # Idempotency
 # -------------------------
 
+
 def test_create_text_index_repeatable(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Calling create_text_index twice on the same index must not raise
     and retrieval must still return correct results."""
@@ -1333,6 +1359,7 @@ async def test_acreate_text_index_repeatable(
 # acreate_text_index raw table async + returned_columns
 # -------------------------
 
+
 @pytest.mark.asyncio
 async def test_acreate_text_index_raw_table_with_returned_columns(
     aconnection, connection, cleanup, resource_names
@@ -1345,7 +1372,8 @@ async def test_acreate_text_index_raw_table_with_returned_columns(
             "EXCEPTION WHEN OTHERS THEN NULL; END;"
         )
         cur.execute(
-            f"CREATE TABLE {resource_names['table_raw']} (title VARCHAR2(200), body CLOB)"
+            f"CREATE TABLE {resource_names['table_raw']} "
+            "(title VARCHAR2(200), body CLOB)"
         )
         cur.execute(
             f"INSERT INTO {resource_names['table_raw']}(title, body) VALUES (:1, :2)",
@@ -1382,8 +1410,13 @@ async def test_acreate_text_index_raw_table_with_returned_columns(
 # k larger than document count
 # -------------------------
 
+
 def test_text_k_larger_than_doc_count(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Requesting more results than documents must return all available
     documents without raising."""
@@ -1433,8 +1466,13 @@ async def test_text_k_larger_than_doc_count_async(
 # k override at call time
 # -------------------------
 
+
 def test_text_retriever_k_override_at_invoke(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """k passed at retriever.invoke() call time must override the constructor k."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1451,8 +1489,14 @@ def test_text_retriever_k_override_at_invoke(
 # ConnectionPool as client
 # -------------------------
 
+
 def test_create_text_index_with_pool(
-    pool, connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    pool,
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """create_text_index must work when client is a ConnectionPool."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1476,7 +1520,12 @@ def test_create_text_index_with_pool(
 
 
 def test_text_retrieval_with_pool_in_vs(
-    pool, connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    pool,
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """OracleTextSearchRetriever must work when OracleVS.client is a pool."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1492,11 +1541,11 @@ def test_text_retrieval_with_pool_in_vs(
         table_name=resource_names["table_vs"],
         distance_strategy=DistanceStrategy.COSINE,
     )
-    create_text_index(pool, idx_name=resource_names["index_vs_text"], vector_store=vs_pool)
-
-    retriever = OracleTextSearchRetriever(
-        vector_store=vs_pool, k=2, return_scores=True
+    create_text_index(
+        pool, idx_name=resource_names["index_vs_text"], vector_store=vs_pool
     )
+
+    retriever = OracleTextSearchRetriever(vector_store=vs_pool, k=2, return_scores=True)
     docs = retriever.invoke("database tablespace")
     assert len(docs) >= 1
     assert "score" in docs[0].metadata
@@ -1525,8 +1574,13 @@ def test_text_retrieval_raw_table_with_pool(
 # Score descending ordering
 # -------------------------
 
+
 def test_text_scores_descending_vs(
-    connection, cleanup, resource_names, db_embedder_params, three_doc_texts_and_metadatas
+    connection,
+    cleanup,
+    resource_names,
+    db_embedder_params,
+    three_doc_texts_and_metadatas,
 ) -> None:
     """Scores returned by OracleVS-backed text retrieval must be descending."""
     texts, metadatas = three_doc_texts_and_metadatas
@@ -1542,9 +1596,7 @@ def test_text_scores_descending_vs(
     )
 
 
-def test_text_scores_descending_raw_table(
-    connection, cleanup, resource_names
-) -> None:
+def test_text_scores_descending_raw_table(connection, cleanup, resource_names) -> None:
     """Scores returned by raw-table text retrieval must be descending."""
     _create_raw_table_and_index_3doc(connection, resource_names)
 
